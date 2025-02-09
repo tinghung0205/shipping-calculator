@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>運費計算器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h2 {
+            color: #333;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: left;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1.1rem;
+        }
+        button {
+            width: 100%;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            margin-top: 15px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 5px;
+            text-align: left;
+            font-size: 1.1rem;
+        }
+        #copyableText {
+            display: none;
+            background: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+            text-align: left;
+            cursor: pointer;
+            white-space: pre-line;
+        }
+        @media (max-width: 600px) {
+            .container {
+                width: 95%;
+                padding: 20px;
+            }
+            button {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>運費計算器</h2>
+        <label for="n">總人頭數:</label>
+        <input type="number" id="n" min="1" value="1">
+        
+        <label for="y">每公斤金額:</label>
+        <input type="number" id="y" step="0.01" min="0">
+        
+        <button onclick="startCalculation()">開始輸入包裹</button>
+        
+        <div id="packageInput" style="display: none;">
+            <label id="progressLabel" for="x">包裹重量:</label>
+            <input type="text" id="x" placeholder="可輸入數學計算，例如 50 20">
+            
+            <label for="z">是否代收 (1 = 是, 0 = 否):</label>
+            <input type="number" id="z" min="0" max="1">
+            
+            <button onclick="calculate()">計算</button>
+        </div>
+
+        <h3>結果:</h3>
+        <div id="results"></div>
+
+        <button onclick="generateCopyableText()">生成 Excel 格式</button>
+        <pre id="copyableText" onclick="copyToClipboard()">點擊複製數據</pre>
+    </div>
+    
+    <script>
+        let currentIndex = 0;
+        let totalPeople = 0;
+        let costPerKg = 0;
+        let costResults = [];
+
+        function startCalculation() {
+            totalPeople = parseInt(document.querySelector('#n').value);
+            costPerKg = parseFloat(document.querySelector('#y').value);
+
+            if (isNaN(totalPeople) || isNaN(costPerKg) || totalPeople <= 0 || costPerKg < 0) {
+                alert("請輸入有效的數值");
+                return;
+            }
+
+            currentIndex = 0;
+            costResults = [];
+            document.querySelector('#results').innerHTML = ''; 
+            document.querySelector('#packageInput').style.display = 'block';
+
+            updateProgress();
+        }
+
+        function calculate() {
+            if (currentIndex >= totalPeople) return;
+
+            let weightInput = document.querySelector('#x').value.trim();
+            let cashOnDelivery = parseInt(document.querySelector('#z').value);
+
+            let weight = safeEvaluate(weightInput);
+
+            if (isNaN(weight) || isNaN(cashOnDelivery) || weight < 0 || (cashOnDelivery !== 0 && cashOnDelivery !== 1)) {
+                alert("請輸入有效的數值");
+                return;
+            }
+
+            let extraCharge = cashOnDelivery === 1 ? 20 : 0;
+            let baseCharge = weight < 0.5 ? Math.ceil((weight * costPerKg) / 2) :
+                             weight <= 1.5 ? Math.ceil(weight * costPerKg + 5) :
+                             Math.ceil(weight * costPerKg + 10);
+
+            let finalCost = baseCharge + extraCharge;
+            costResults.push(finalCost);
+
+            let resultsDiv = document.querySelector('#results');
+            resultsDiv.innerHTML += `<p>包裹 ${currentIndex + 1} 最終收費: ${finalCost} 元</p>`;
+
+            currentIndex++;
+            
+            if (currentIndex >= totalPeople) {
+                document.querySelector('#packageInput').style.display = 'none';
+                alert("所有包裹計算完成！");
+            } else {
+                document.querySelector('#x').value = '';
+                document.querySelector('#z').value = '';
+                updateProgress();
+            }
+        }
+
+        function updateProgress() {
+            document.querySelector('#progressLabel').textContent = `正在輸入第 ${currentIndex + 1} 個包裹，共 ${totalPeople} 個`;
+        }
+
+        function safeEvaluate(expression) {
+            expression = expression.replace(/\s+/g, '+');
+            try {
+                return new Function(`return ${expression}`)();
+            } catch {
+                return NaN;
+            }
+        }
+
+        function generateCopyableText() {
+            let copyText = costResults.join("\n"); 
+            let outputDiv = document.querySelector("#copyableText");
+            
+            outputDiv.textContent = copyText;
+            outputDiv.style.display = "block";
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(document.querySelector("#copyableText").textContent)
+                .then(() => alert("已複製到剪貼簿！"));
+        }
+    </script>
+</body>
+</html>
