@@ -7,80 +7,71 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
             background-color: #f4f4f4;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
+            padding: 20px;
         }
         .container {
-            max-width: 500px;
+            max-width: 900px;
             width: 100%;
-            padding: 30px;
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            padding: 50px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
             text-align: center;
         }
-        h2 {
-            color: #333;
-        }
-        label {
-            display: block;
-            margin-top: 10px;
-            font-weight: bold;
-            text-align: left;
-        }
+        h2 { color: #333; }
+        label { display: block; margin-top: 15px; text-align: left; font-weight: bold; }
         input {
-            width: 100%;
-            padding: 12px;
+            width: calc(100% - 24px);
+            padding: 14px;
             margin-top: 5px;
             border: 1px solid #ccc;
-            border-radius: 5px;
+            border-radius: 8px;
             font-size: 1.1rem;
         }
         button {
             width: 100%;
+            padding: 16px;
+            margin-top: 15px;
             background-color: #007bff;
             color: white;
             border: none;
-            padding: 12px;
-            border-radius: 5px;
             cursor: pointer;
+            border-radius: 8px;
             font-size: 1.1rem;
-            margin-top: 15px;
+            transition: background 0.3s;
         }
-        button:hover {
-            background-color: #0056b3;
-        }
-        #results {
-            margin-top: 20px;
-            padding: 15px;
-            background: #e9ecef;
-            border-radius: 5px;
-            text-align: left;
-            font-size: 1.1rem;
-        }
-        #copyableText {
-            display: none;
-            background: #f4f4f4;
-            padding: 10px;
-            border: 1px solid #ccc;
+        button:hover { background-color: #0056b3; }
+        .toggle-buttons {
+            display: flex;
+            justify-content: space-between;
             margin-top: 10px;
-            text-align: left;
-            cursor: pointer;
-            white-space: pre-line;
         }
-        @media (max-width: 600px) {
-            .container {
-                width: 95%;
-                padding: 20px;
-            }
-            button {
-                font-size: 1.2rem;
-            }
+        .toggle-buttons button {
+            width: 48%;
+            background-color: #ddd;
+            color: black;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            transition: background 0.3s, transform 0.1s;
+        }
+        .toggle-buttons button:hover { background-color: #ccc; }
+        .selected {
+            background-color: #007bff;
+            color: white;
+            transform: scale(1.05);
+        }
+        #results, #copyableText {
+            margin-top: 20px;
+            text-align: left;
+            white-space: pre-line;
+            font-size: 1.1rem;
         }
     </style>
 </head>
@@ -97,104 +88,77 @@
         
         <div id="packageInput" style="display: none;">
             <label id="progressLabel" for="x">包裹重量:</label>
-            <input type="text" id="x" placeholder="可輸入數學計算，例如 50 20">
+            <input type="text" id="x" placeholder="輸入重量，例如 1.2">
             
-            <label for="z">是否代收 (1 = 是, 0 = 否):</label>
-            <input type="number" id="z" min="0" max="1">
+            <label>是否代收:</label>
+            <div class="toggle-buttons">
+                <button id="codYes" onclick="setCOD(1)">是</button>
+                <button id="codNo" onclick="setCOD(0)" class="selected">否</button>
+            </div>
             
             <button onclick="calculate()">計算</button>
         </div>
-
+        
         <h3>結果:</h3>
         <div id="results"></div>
-
+        
         <button onclick="generateCopyableText()">生成 Excel 格式</button>
         <pre id="copyableText" onclick="copyToClipboard()">點擊複製數據</pre>
     </div>
     
     <script>
-        let currentIndex = 0;
-        let totalPeople = 0;
-        let costPerKg = 0;
-        let costResults = [];
+        let currentIndex = 0, totalPeople = 0, costPerKg = 0, costResults = [], codFlag = 0;
 
         function startCalculation() {
             totalPeople = parseInt(document.querySelector('#n').value);
             costPerKg = parseFloat(document.querySelector('#y').value);
-
             if (isNaN(totalPeople) || isNaN(costPerKg) || totalPeople <= 0 || costPerKg < 0) {
                 alert("請輸入有效的數值");
                 return;
             }
-
             currentIndex = 0;
             costResults = [];
             document.querySelector('#results').innerHTML = ''; 
             document.querySelector('#packageInput').style.display = 'block';
-
             updateProgress();
         }
 
         function calculate() {
             if (currentIndex >= totalPeople) return;
-
-            let weightInput = document.querySelector('#x').value.trim();
-            let cashOnDelivery = parseInt(document.querySelector('#z').value);
-
-            let weight = safeEvaluate(weightInput);
-
-            if (isNaN(weight) || isNaN(cashOnDelivery) || weight < 0 || (cashOnDelivery !== 0 && cashOnDelivery !== 1)) {
-                alert("請輸入有效的數值");
+            let weight = parseFloat(document.querySelector('#x').value.trim());
+            if (isNaN(weight) || weight < 0) {
+                alert("請輸入有效的重量");
                 return;
             }
-
-            let extraCharge = cashOnDelivery === 1 ? 20 : 0;
-            let baseCharge = weight < 0.5 ? Math.ceil((weight * costPerKg) / 2) :
-                             weight <= 1.5 ? Math.ceil(weight * costPerKg + 5) :
-                             Math.ceil(weight * costPerKg + 10);
-
-            let finalCost = baseCharge + extraCharge;
+            let finalCost = computeShippingCost(weight, costPerKg, codFlag);
             costResults.push(finalCost);
-
-            let resultsDiv = document.querySelector('#results');
-            resultsDiv.innerHTML += `<p>包裹 ${currentIndex + 1} 最終收費: ${finalCost} 元</p>`;
-
+            document.querySelector('#results').innerHTML += `<p>包裹 ${currentIndex + 1} 最終收費: ${finalCost} 元</p>`;
             currentIndex++;
-            
             if (currentIndex >= totalPeople) {
                 document.querySelector('#packageInput').style.display = 'none';
                 alert("所有包裹計算完成！");
             } else {
                 document.querySelector('#x').value = '';
-                document.querySelector('#z').value = '';
+                setCOD(0);
                 updateProgress();
             }
+        }
+
+        function computeShippingCost(weight, costPerKg, isCOD) {
+            let baseCharge = (weight < 0.5) ? Math.ceil(costPerKg / 2) :
+                             (weight <= 1.5) ? Math.ceil(weight * costPerKg + 5) :
+                                               Math.ceil(weight * costPerKg + 10);
+            return (weight >= 0.5 && isCOD === 1) ? baseCharge + 20 : baseCharge;
         }
 
         function updateProgress() {
             document.querySelector('#progressLabel').textContent = `正在輸入第 ${currentIndex + 1} 個包裹，共 ${totalPeople} 個`;
         }
 
-        function safeEvaluate(expression) {
-            expression = expression.replace(/\s+/g, '+');
-            try {
-                return new Function(`return ${expression}`)();
-            } catch {
-                return NaN;
-            }
-        }
-
-        function generateCopyableText() {
-            let copyText = costResults.join("\n"); 
-            let outputDiv = document.querySelector("#copyableText");
-            
-            outputDiv.textContent = copyText;
-            outputDiv.style.display = "block";
-        }
-
-        function copyToClipboard() {
-            navigator.clipboard.writeText(document.querySelector("#copyableText").textContent)
-                .then(() => alert("已複製到剪貼簿！"));
+        function setCOD(value) {
+            codFlag = value;
+            document.querySelector('#codYes').classList.toggle('selected', value === 1);
+            document.querySelector('#codNo').classList.toggle('selected', value === 0);
         }
     </script>
 </body>
