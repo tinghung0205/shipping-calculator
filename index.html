@@ -16,7 +16,7 @@
             min-height: 100vh;
         }
         .container {
-            max-width: 600px;
+            max-width: 500px;
             width: 100%;
             padding: 30px;
             background: white;
@@ -34,29 +34,12 @@
             text-align: left;
         }
         input {
-            width: calc(100% - 24px);
+            width: 100%;
             padding: 12px;
             margin-top: 5px;
             border: 1px solid #ccc;
             border-radius: 5px;
             font-size: 1.1rem;
-            display: block;
-        }
-        .toggle-button {
-            width: 100px;
-            padding: 10px;
-            margin: 5px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            background-color: #ccc;
-            color: black;
-            transition: background-color 0.2s;
-        }
-        .toggle-button.active {
-            background-color: #555;
-            color: white;
         }
         button {
             width: 100%;
@@ -72,6 +55,10 @@
         button:hover {
             background-color: #0056b3;
         }
+        .selected {
+            background-color: #28a745 !important;
+            color: white;
+        }
         #results {
             margin-top: 20px;
             padding: 15px;
@@ -80,11 +67,25 @@
             text-align: left;
             font-size: 1.1rem;
         }
-        @media (max-width: 600px) {
-            .container {
-                width: 95%;
-                padding: 20px;
-            }
+        .toggle-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .toggle-buttons button {
+            flex: 1;
+            background-color: #ccc;
+            color: black;
+        }
+        #copyableText {
+            display: none;
+            background: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+            text-align: left;
+            cursor: pointer;
+            white-space: pre-line;
         }
     </style>
 </head>
@@ -104,9 +105,9 @@
             <input type="text" id="x" placeholder="可輸入數學計算，例如 50 20">
             
             <label>是否代收:</label>
-            <div>
-                <button id="yesBtn" class="toggle-button" onclick="setCashOnDelivery(1)">是</button>
-                <button id="noBtn" class="toggle-button" onclick="setCashOnDelivery(0)">否</button>
+            <div class="toggle-buttons">
+                <button id="btnYes" onclick="selectCOD(1)">是</button>
+                <button id="btnNo" onclick="selectCOD(0)">否</button>
             </div>
             
             <button onclick="calculate()">計算</button>
@@ -114,36 +115,32 @@
 
         <h3>結果:</h3>
         <div id="results"></div>
+
+        <button onclick="generateCopyableText()">生成 Excel 格式</button>
+        <pre id="copyableText" onclick="copyToClipboard()">點擊複製數據</pre>
     </div>
     
     <script>
         let currentIndex = 0;
         let totalPeople = 0;
         let costPerKg = 0;
+        let selectedCOD = 0;
         let costResults = [];
-        let cashOnDelivery = 0;
 
         function startCalculation() {
             totalPeople = parseInt(document.querySelector('#n').value);
             costPerKg = parseFloat(document.querySelector('#y').value);
-
+            
             if (isNaN(totalPeople) || isNaN(costPerKg) || totalPeople <= 0 || costPerKg < 0) {
                 alert("請輸入有效的數值");
                 return;
             }
-
+            
             currentIndex = 0;
             costResults = [];
             document.querySelector('#results').innerHTML = ''; 
             document.querySelector('#packageInput').style.display = 'block';
-
             updateProgress();
-        }
-
-        function setCashOnDelivery(value) {
-            cashOnDelivery = value;
-            document.getElementById("yesBtn").classList.toggle("active", value === 1);
-            document.getElementById("noBtn").classList.toggle("active", value === 0);
         }
 
         function calculate() {
@@ -151,23 +148,22 @@
 
             let weightInput = document.querySelector('#x').value.trim();
             let weight = safeEvaluate(weightInput);
-
             if (isNaN(weight) || weight < 0) {
                 alert("請輸入有效的數值");
                 return;
             }
 
-            let extraCharge = (weight >= 0.5) ? (cashOnDelivery === 1 ? 20 : 0) : 0;
+            let extraCharge = (weight >= 0.5) ? (selectedCOD === 1 ? 20 : 0) : 0;
             let baseCharge = weight < 0.5 ? Math.ceil(costPerKg / 2) :
                              weight <= 1.5 ? Math.ceil(weight * costPerKg + 5) :
                              Math.ceil(weight * costPerKg + 10);
+
             let finalCost = baseCharge + extraCharge;
             costResults.push(finalCost);
-
-            let resultsDiv = document.querySelector('#results');
-            resultsDiv.innerHTML += `<p>包裹 ${currentIndex + 1} 最終收費: ${finalCost} 元</p>`;
+            document.querySelector('#results').innerHTML += `<p>包裹 ${currentIndex + 1} 最終收費: ${finalCost} 元</p>`;
 
             currentIndex++;
+            
             if (currentIndex >= totalPeople) {
                 document.querySelector('#packageInput').style.display = 'none';
                 alert("所有包裹計算完成！");
@@ -177,6 +173,10 @@
             }
         }
 
+        function updateProgress() {
+            document.querySelector('#progressLabel').textContent = `正在輸入第 ${currentIndex + 1} 個包裹，共 ${totalPeople} 個`;
+        }
+
         function safeEvaluate(expression) {
             expression = expression.replace(/\s+/g, '+');
             try {
@@ -184,6 +184,22 @@
             } catch {
                 return NaN;
             }
+        }
+
+        function generateCopyableText() {
+            document.querySelector("#copyableText").textContent = costResults.join("\n");
+            document.querySelector("#copyableText").style.display = "block";
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(document.querySelector("#copyableText").textContent)
+                .then(() => alert("已複製到剪貼簿！"));
+        }
+
+        function selectCOD(value) {
+            selectedCOD = value;
+            document.querySelector("#btnYes").classList.toggle("selected", value === 1);
+            document.querySelector("#btnNo").classList.toggle("selected", value === 0);
         }
     </script>
 </body>
